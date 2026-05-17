@@ -32,3 +32,7 @@ upcoming_features.md
 GEMINI.md
 CHANGELOG.md
 CLAUDE.md
+.gemini/
+.github/
+.vscode/
+
