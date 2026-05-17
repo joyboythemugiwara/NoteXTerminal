@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   hasLeaf,
   leafIds,
@@ -22,7 +22,6 @@ export type TerminalTab = {
   cwd?: string;
   paneTree: PaneNode;
   activeLeafId: number;
-  /** AI agent cannot read buffer / context of this terminal. */
   private?: boolean;
 };
 
@@ -47,23 +46,13 @@ export type PreviewTab = {
   url: string;
 };
 
-export type AiDiffStatus = "pending" | "approved" | "rejected";
-
-export type AiDiffTab = {
+export type ApiClientTab = {
   id: number;
-  kind: "ai-diff";
+  kind: "api-client";
   title: string;
-  path: string;
-  /** "" for newly created files. */
-  originalContent: string;
-  proposedContent: string;
-  /** Tool-call approval id used to resolve the AI SDK approval. */
-  approvalId: string;
-  status: AiDiffStatus;
-  isNewFile: boolean;
 };
 
-export type Tab = TerminalTab | EditorTab | PreviewTab | AiDiffTab;
+export type Tab = TerminalTab | EditorTab | PreviewTab | ApiClientTab;
 
 export type TabPatch = Partial<{
   title: string;
@@ -72,11 +61,6 @@ export type TabPatch = Partial<{
   dirty: boolean;
   url: string;
 }>;
-
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : path;
-}
 
 function titleFromUrl(url: string): string {
   try {
@@ -87,23 +71,41 @@ function titleFromUrl(url: string): string {
   }
 }
 
-export function useTabs(initial?: Partial<TerminalTab>) {
+export function useTabs(initial?: { tabs?: Tab[]; activeId?: number; cwd?: string }) {
   const [tabs, setTabs] = useState<Tab[]>(() => {
+    if (initial?.tabs && initial.tabs.length > 0) {
+      return initial.tabs;
+    }
     const tabId = 1;
     const leafId = 2;
     return [
       {
         id: tabId,
         kind: "terminal",
-        title: initial?.title ?? "shell",
+        title: "shell",
         cwd: initial?.cwd,
         paneTree: { kind: "leaf", id: leafId, cwd: initial?.cwd },
         activeLeafId: leafId,
       },
     ];
   });
-  const [activeId, setActiveId] = useState(1);
-  const nextIdRef = useRef(3);
+  const [activeId, setActiveId] = useState(initial?.activeId ?? 1);
+  const [broadcastActive, setBroadcastActive] = useState(false);
+
+  const nextIdRef = useRef(1);
+  useEffect(() => {
+    // Ensure nextIdRef is always ahead of any existing IDs.
+    let max = 0;
+    for (const t of tabs) {
+      max = Math.max(max, t.id);
+      if (t.kind === "terminal") {
+        for (const lid of leafIds(t.paneTree)) {
+          max = Math.max(max, lid);
+        }
+      }
+    }
+    nextIdRef.current = max + 1;
+  }, [tabs]);
 
   const newTab = useCallback((cwd?: string) => {
     const tabId = nextIdRef.current++;
@@ -142,21 +144,11 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     return tabId;
   }, []);
 
-  /**
-   * Opens a file in an editor tab.
-   *
-   * - `pin = true` (default) — opens or activates a **persistent** tab.
-   *   If the path is currently in the preview slot it is promoted in-place.
-   *   Use this for programmatic opens (AI diff, New File dialog, etc.).
-   * - `pin = false` — VSCode-style **preview** tab. A single shared slot is
-   *   reused: if a persistent tab for the path already exists it is activated;
-   *   otherwise the current preview slot is replaced with the new path.
-   */
   const openFileTab = useCallback((path: string, pin = true) => {
     let targetId: number | null = null;
     setTabs((curr) => {
+      const basename = (p: string) => p.split(/[\\/]/).pop() || p;
       if (pin) {
-        // Persistent open: find any existing editor tab, pin it if needed.
         const existing = curr.find(
           (t) => t.kind === "editor" && t.path === path,
         );
@@ -183,23 +175,22 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           } satisfies EditorTab,
         ];
       } else {
-        // Preview open: persistent tab for this path takes priority.
         const persistent = curr.find(
-          (t) => t.kind === "editor" && t.path === path && !(t as EditorTab).preview,
+          (t) =>
+            t.kind === "editor" && t.path === path && !(t as EditorTab).preview,
         );
         if (persistent) {
           targetId = persistent.id;
           return curr;
         }
-        // Reuse the slot if it already shows the same path.
         const existingPreview = curr.find(
-          (t) => t.kind === "editor" && t.path === path && (t as EditorTab).preview,
+          (t) =>
+            t.kind === "editor" && t.path === path && (t as EditorTab).preview,
         );
         if (existingPreview) {
           targetId = existingPreview.id;
           return curr;
         }
-        // Replace the current preview slot, or append a new one.
         const previewIdx = curr.findIndex(
           (t) => t.kind === "editor" && (t as EditorTab).preview,
         );
@@ -223,10 +214,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     return targetId as number | null;
   }, []);
 
-  /**
-   * Promotes a preview tab to a persistent one. Called on double-click of the
-   * tab title in the tab bar. Dirty edits also auto-promote (see `updateTab`).
-   */
   const pinTab = useCallback((id: number) => {
     setTabs((curr) =>
       curr.map((t) =>
@@ -235,88 +222,19 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     );
   }, []);
 
-  const openAiDiffTab = useCallback(
-    (input: {
-      path: string;
-      originalContent: string;
-      proposedContent: string;
-      approvalId: string;
-      isNewFile: boolean;
-    }) => {
-      let targetId: number | null = null;
-      setTabs((curr) => {
-        const existing = curr.find(
-          (t) => t.kind === "ai-diff" && t.approvalId === input.approvalId,
-        );
-        if (existing) {
-          targetId = existing.id;
-          return curr;
-        }
-        const id = nextIdRef.current++;
-        targetId = id;
-        const title = `${basename(input.path)} (AI diff)`;
-        return [
-          ...curr,
-          {
-            id,
-            kind: "ai-diff",
-            title,
-            path: input.path,
-            originalContent: input.originalContent,
-            proposedContent: input.proposedContent,
-            approvalId: input.approvalId,
-            status: "pending",
-            isNewFile: input.isNewFile,
-          },
-        ];
-      });
-      if (targetId !== null) setActiveId(targetId);
-      return targetId as number | null;
-    },
-    [],
-  );
-
-  const setAiDiffStatus = useCallback(
-    (approvalId: string, status: AiDiffStatus) => {
-      setTabs((curr) =>
-        curr.map((t) =>
-          t.kind === "ai-diff" && t.approvalId === approvalId
-            ? { ...t, status }
-            : t,
-        ),
-      );
-    },
-    [],
-  );
-
-  const closeAiDiffTab = useCallback((approvalId: string) => {
-    setTabs((curr) => {
-      const target = curr.find(
-        (t) => t.kind === "ai-diff" && t.approvalId === approvalId,
-      );
-      if (!target || curr.length <= 1) {
-        if (!target) return curr;
-        return curr.map((t) =>
-          t.kind === "ai-diff" && t.approvalId === approvalId
-            ? { ...t, status: "approved" as AiDiffStatus }
-            : t,
-        );
-      }
-      const idx = curr.findIndex((t) => t.id === target.id);
-      const next = curr.filter((t) => t.id !== target.id);
-      setActiveId((active) =>
-        target.id === active ? next[Math.max(0, idx - 1)].id : active,
-      );
-      return next;
-    });
-  }, []);
-
   const newPreviewTab = useCallback((url: string) => {
     const id = nextIdRef.current++;
     setTabs((t) => [
       ...t,
       { id, kind: "preview", title: titleFromUrl(url), url },
     ]);
+    setActiveId(id);
+    return id;
+  }, []);
+
+  const newApiClientTab = useCallback(() => {
+    const id = nextIdRef.current++;
+    setTabs((t) => [...t, { id, kind: "api-client", title: "API Client" }]);
     setActiveId(id);
     return id;
   }, []);
@@ -360,7 +278,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
             }),
           };
         }
-        // editor tab: auto-promote from preview the moment the file becomes dirty.
         const autoPin =
           patch.dirty === true && (x as EditorTab).preview
             ? { preview: false }
@@ -384,11 +301,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     [tabs],
   );
 
-  /** Update a leaf's cwd; mirror to the tab's `cwd` when the leaf is active.
-   * Bails out without setTabs when nothing actually changed — shell integration
-   * re-emits OSC 7 on every prompt, including empty Enters, so this fires at
-   * keystroke rate. Always-setTabs there cascades a paneTree re-render across
-   * every open tab. */
   const setLeafCwd = useCallback((leafId: number, cwd: string) => {
     setTabs((curr) => {
       let changed = false;
@@ -416,21 +328,17 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     );
   }, []);
 
-  const focusNextPaneInTab = useCallback(
-    (tabId: number, delta: 1 | -1) => {
-      setTabs((curr) =>
-        curr.map((t) => {
-          if (t.id !== tabId || t.kind !== "terminal") return t;
-          const next = nextLeafId(t.paneTree, t.activeLeafId, delta);
-          if (next === t.activeLeafId) return t;
-          return { ...t, activeLeafId: next };
-        }),
-      );
-    },
-    [],
-  );
+  const focusNextPaneInTab = useCallback((tabId: number, delta: 1 | -1) => {
+    setTabs((curr) =>
+      curr.map((t) => {
+        if (t.id !== tabId || t.kind !== "terminal") return t;
+        const next = nextLeafId(t.paneTree, t.activeLeafId, delta);
+        if (next === t.activeLeafId) return t;
+        return { ...t, activeLeafId: next };
+      }),
+    );
+  }, []);
 
-  /** Split the active leaf of `tabId` along `dir`. Returns the new leaf id. */
   const splitActivePane = useCallback(
     (tabId: number, dir: SplitDir): number | null => {
       let newLeafId: number | null = null;
@@ -512,8 +420,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       }
       const remaining = leafIds(newTree);
       const sib = siblingLeafOf(t.paneTree, target);
-      const newActive =
-        sib && remaining.includes(sib) ? sib : remaining[0];
+      const newActive = sib && remaining.includes(sib) ? sib : remaining[0];
       removedLeaf = target;
       return curr.map((x) =>
         x.id === tabId
@@ -548,18 +455,22 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     for (const lid of toDispose) disposeSession(lid);
   }, []);
 
+  const toggleBroadcast = useCallback(() => {
+    setBroadcastActive((v) => !v);
+  }, []);
+
   return {
     tabs,
     activeId,
     setActiveId,
+    broadcastActive,
+    toggleBroadcast,
     newTab,
     newPrivateTab,
     openFileTab,
     pinTab,
     newPreviewTab,
-    openAiDiffTab,
-    setAiDiffStatus,
-    closeAiDiffTab,
+    newApiClientTab,
     closeTab,
     updateTab,
     selectByIndex,

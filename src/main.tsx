@@ -8,14 +8,19 @@ import "./styles/globals.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import ReactDOM from "react-dom/client";
 import App from "./app/App";
+import { initLaunchDir } from "./lib/launchDir";
+import { loadSession } from "./modules/settings/session";
 import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
 
 if (USE_CUSTOM_WINDOW_CONTROLS) {
   document.documentElement.dataset.chrome = "borderless";
 }
 
+// Seed before first paint so default tab mounts at target cwd (no flicker).
+const [session] = await Promise.all([loadSession(), initLaunchDir()]);
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <App />,
+  <App initialSession={session ?? undefined} />,
 );
 
 // Window starts hidden (per tauri.conf.json) so users never see a transparent

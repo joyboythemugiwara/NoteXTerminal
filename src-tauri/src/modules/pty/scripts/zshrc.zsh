@@ -1,27 +1,22 @@
-# terax-shell-integration (zshrc)
-#
-# Emits OSC 7 (cwd) + OSC 133 A/B/C/D (prompt-start / prompt-end / pre-exec /
-# command-done-with-exit-code) so the host can detect command boundaries and
-# track cwd without re-parsing the prompt. `status` is a read-only special in
-# zsh, so we shadow $? into `_terax_ret`.
+# notex-shell-integration (zshrc)
 
 {
-  _terax_user_zdotdir="${TERAX_USER_ZDOTDIR:-$HOME}"
-  [ -f "$_terax_user_zdotdir/.zshrc" ] && source "$_terax_user_zdotdir/.zshrc"
-  unset _terax_user_zdotdir
+  _notex_user_zdotdir="${NOTEX_USER_ZDOTDIR:-$HOME}"
+  [ -f "$_notex_user_zdotdir/.zshrc" ] && source "$_notex_user_zdotdir/.zshrc"
+  unset _notex_user_zdotdir
 }
 
-# Re-source guard within a single shell (e.g. user runs `source ~/.zshrc`).
-# This is NOT exported, so each nested zsh installs its own hooks — desired,
-# since every interactive shell needs its own prompt integration.
-if [[ -z "$__TERAX_HOOKS_LOADED" ]]; then
-  __TERAX_HOOKS_LOADED=1
+if [[ -z "$__NOTEX_HOOKS_LOADED" ]]; then
+  __NOTEX_HOOKS_LOADED=1
   autoload -Uz add-zsh-hook 2>/dev/null
+  autoload -Uz vcs_info 2>/dev/null
 
-  # URL-encode $PWD byte-wise so multi-byte paths stay valid in the `file://`
-  # URI emitted via OSC 7. `no_multibyte` forces ${s[i]} to index bytes (not
-  # code points), and LC_ALL=C keeps the [a-zA-Z0-9...] class single-byte.
-  _terax_urlencode() {
+  # VCS info setup (for branch name)
+  zstyle ':vcs_info:*' enable git
+  zstyle ':vcs_info:git:*' formats ' [ %b]'
+  zstyle ':vcs_info:git:*' actionformats ' [ %b|%a]'
+
+  _notex_urlencode() {
     emulate -L zsh
     setopt localoptions no_multibyte
     local LC_ALL=C s="$1" i byte
@@ -34,26 +29,36 @@ if [[ -z "$__TERAX_HOOKS_LOADED" ]]; then
     done
   }
 
-  _terax_precmd() {
-    local _terax_ret=$?
-    printf '\e]133;D;%s\e\\' "$_terax_ret"
-    printf '\e]7;file://%s%s\e\\' "${HOST}" "$(_terax_urlencode "$PWD")"
-    # Re-inject prompt-end marker in case a framework rebuilt PS1 (p10k, starship).
+  _notex_precmd() {
+    local _notex_ret=$?
+    
+    # Update VCS info
+    vcs_info
+    
+    printf '\e]133;D;%s\e\\' "$_notex_ret"
+    printf '\e]7;file://%s%s\e\\' "${HOST}" "$(_notex_urlencode "$PWD")"
+    
+    # Re-inject NoteX prompt if PS1 was clobbered or first run
     if [[ "$PS1" != *$'\e]133;B\e\\'* ]]; then
-      PS1=$'%{\e]133;B\e\\%}'"$PS1"
+      local user_host='%F{green}%n%f@%F{green}%m%f'
+      local cwd='%F{blue}%~%f'
+      local git_branch='%F{cyan}${vcs_info_msg_0_}%f'
+      local suffix=' %F{green}%#%f '
+      
+      PS1=$'%{\e]133;B\e\\%}'"$user_host:$cwd$git_branch$suffix"
     fi
     printf '\e]133;A\e\\'
   }
 
-  _terax_preexec() {
+  _notex_preexec() {
     printf '\e]133;C\e\\'
   }
 
   if (( $+functions[add-zsh-hook] )); then
-    add-zsh-hook precmd _terax_precmd
-    add-zsh-hook preexec _terax_preexec
+    add-zsh-hook precmd _notex_precmd
+    add-zsh-hook preexec _notex_preexec
   fi
 
-  _terax_precmd
+  _notex_precmd
 fi
 :

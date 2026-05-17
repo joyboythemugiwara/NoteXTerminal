@@ -42,7 +42,6 @@ type Props = {
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
-  onAttachToAgent?: (path: string) => void;
 };
 
 function basename(path: string): string {
@@ -58,7 +57,6 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
       onPathRenamed,
       onPathDeleted,
       onRevealInTerminal,
-      onAttachToAgent,
     },
     ref,
   ) => {
@@ -291,7 +289,6 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
           onRequestClose={() => setIsSearchOpen(false)}
           onActiveChange={setIsSearchActive}
           onRevealInTerminal={onRevealInTerminal}
-          onAttachToAgent={onAttachToAgent}
         />
   
         {!isSearchActive ? (
@@ -347,7 +344,6 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
                         tree={tree}
                         onOpenFile={onOpenFile}
                         onRevealInTerminal={onRevealInTerminal}
-                        onAttachToAgent={onAttachToAgent}
                         selectedPath={selectedPath}
                         onSelectPath={setSelectedPath}
                       />

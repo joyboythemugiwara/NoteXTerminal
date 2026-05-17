@@ -1,50 +1,55 @@
-# terax-shell-integration (fish)
-# Emits OSC 7 (cwd) + OSC 133 A/B/C/D so the host tracks cwd and prompt
-# boundaries without re-parsing the prompt.
+# notex-shell-integration (init.fish)
 
-if set -q __TERAX_HOOKS_LOADED
-    exit 0
-end
-set -g __TERAX_HOOKS_LOADED 1
+# Skip if not interactive
+status is-interactive; or exit
 
-set -g __TERAX_HOST (uname -n 2>/dev/null; or echo localhost)
+if not set -q __NOTEX_HOOKS_LOADED
+    set -g __NOTEX_HOOKS_LOADED 1
 
-# URL-encode a path keeping `/` intact so it stays valid inside file://.
-function __terax_urlencode_path
-    set -l parts (string split '/' -- $argv[1])
-    set -l out
-    for p in $parts
-        if test -n "$p"
-            set out $out (string escape --style=url -- $p)
-        else
-            set out $out ""
+    function _notex_urlencode
+        python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read(), safe=''))"
+    end
+
+    function _notex_precmd --on-event fish_prompt
+        set -l last_status $status
+        printf "\e]133;D;%s\e\\" $last_status
+        
+        set -l hostname (hostname)
+        set -l encoded_pwd (pwd | _notex_urlencode)
+        printf "\e]7;file://%s%s\e\\" $hostname $encoded_pwd
+        printf "\e]133;A\e\\"
+    end
+
+    function _notex_preexec --on-event fish_preexec
+        printf "\e]133;C\e\\"
+    end
+
+    # Beautiful NoteX Fish Prompt
+    function fish_prompt
+        printf "\e]133;B\e\\"
+        
+        set_color green
+        printf "%s" $USER
+        set_color normal
+        printf "@"
+        set_color green
+        printf "%s" (hostname)
+        set_color normal
+        printf ":"
+        set_color blue
+        printf "%s" (prompt_pwd)
+        set_color normal
+
+        # Git branch
+        set -l branch (fish_git_prompt)
+        if test -n "$branch"
+            set_color cyan
+            printf " [ %s]" (string trim $branch)
+            set_color normal
         end
+
+        set_color green
+        printf " > "
+        set_color normal
     end
-    string join '/' $out
-end
-
-function __terax_restore_status
-    return $argv[1]
-end
-
-if functions -q fish_prompt
-    functions -c fish_prompt __terax_user_prompt
-end
-
-function fish_prompt
-    set -l __terax_status $status
-    printf '\e]133;D;%d\e\\' $__terax_status
-    printf '\e]7;file://%s%s\e\\' "$__TERAX_HOST" (__terax_urlencode_path "$PWD")
-    printf '\e]133;A\e\\'
-    __terax_restore_status $__terax_status
-    if functions -q __terax_user_prompt
-        __terax_user_prompt
-    else
-        printf '%s > ' (prompt_pwd)
-    end
-    printf '\e]133;B\e\\'
-end
-
-function __terax_preexec --on-event fish_preexec
-    printf '\e]133;C\e\\'
 end

@@ -9,6 +9,7 @@ type Props = {
   onDirtyChange: (id: number, dirty: boolean) => void;
   registerHandle: (id: number, handle: EditorPaneHandle | null) => void;
   onCloseTab: (id: number) => void;
+  onOpenFile: (path: string) => void;
 };
 
 export function EditorStack({
@@ -17,6 +18,7 @@ export function EditorStack({
   onDirtyChange,
   registerHandle,
   onCloseTab,
+  onOpenFile,
 }: Props) {
   const editors = tabs.filter((t): t is EditorTab => t.kind === "editor");
 
@@ -82,9 +84,36 @@ export function EditorStack({
     }
   }, [editors]);
 
-  if (editors.length === 0) return null;
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    let path = e.dataTransfer.getData("text/plain");
+
+    if (!path && e.dataTransfer.files.length > 0) {
+      path = (e.dataTransfer.files[0] as any).path || e.dataTransfer.files[0].name;
+    }
+
+    if (path) onOpenFile(path);
+  };
+
+  if (editors.length === 0)
+    return (
+      <div
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        className="h-full w-full"
+      />
+    );
   return (
-    <div className="relative h-full w-full">
+    <div
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      className="relative h-full w-full"
+    >
       {editors.map((t) => {
         const visible = t.id === activeId;
         return (

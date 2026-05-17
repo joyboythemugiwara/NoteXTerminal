@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="public/logo.png" width="144" height="144" alt="Terax" />
-  <h1>Terax</h1>
+  <img src="public/logo.png" width="144" height="144" alt="NoteXTerminal" />
+  <h1>NoteXTerminal</h1>
 
   <p><strong>Open-source lightweight cross-platform AI-native terminal (ADE)</strong></p>
 
@@ -14,7 +14,7 @@
 
 ---
 
-Terax is a fast, lightweight AI terminal (ADE) built on Tauri 2 + Rust and React 19. It pairs a native PTY backend with a modern UI — multi-tab terminals, an integrated code editor, a file explorer, and a first-class AI side-panel that works with your own API keys (or fully local models via LM Studio). Under 10 MB on disk, no telemetry, keys stored in the OS keychain.
+NoteXTerminal is a fast, lightweight AI terminal (ADE) built on Tauri 2 + Rust and React 19. It pairs a native PTY backend with a modern UI — multi-tab terminals, an integrated code editor, a file explorer, and a first-class AI side-panel that works with your own API keys (or fully local models via LM Studio). Under 10 MB on disk, no telemetry, keys stored in the OS keychain.
 
 ## Screenshots
 
@@ -71,12 +71,12 @@ The default shell is detected in this order: `pwsh.exe` (PowerShell 7+) → `pow
 ## Linux notes
 
 - **Arch / AUR**: install via `yay -S terax-bin` (or `paru`, etc.). Tracks the latest release.
-- **AppImage**: needs FUSE. Without it: `./Terax_*.AppImage --appimage-extract-and-run`. On Wayland with rendering glitches, try `WEBKIT_DISABLE_DMABUF_RENDERER=1`; otherwise use the `.deb` / `.rpm` which link against the system's GTK stack.
+- **AppImage**: needs FUSE. Without it: `./NoteXTerminal_*.AppImage --appimage-extract-and-run`. On Wayland with rendering glitches, try `WEBKIT_DISABLE_DMABUF_RENDERER=1`; otherwise use the `.deb` / `.rpm` which link against the system's GTK stack.
 
 ## Configure AI
 
 1. Open **Settings → AI**.
-2. Pick a provider and paste your API key. For local inference, point Terax at your LM Studio endpoint.
+2. Pick a provider and paste your API key. For local inference, point NoteXTerminal at your LM Studio endpoint.
 3. Keys are written to the OS keychain via `keyring` — they never touch disk or `localStorage`.
 
 ## Build from source
@@ -109,4 +109,4 @@ Issues and PRs are welcome! Feel free to open issues, suggest features, or submi
 
 ## License
 
-Terax is licensed under the Apache-2.0 License. For more information on our dependencies, see [Apache License 2.0](LICENSE).
+NoteXTerminal is licensed under the Apache-2.0 License. For more information on our dependencies, see [Apache License 2.0](LICENSE).

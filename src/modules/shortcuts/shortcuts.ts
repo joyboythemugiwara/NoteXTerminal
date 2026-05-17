@@ -23,10 +23,16 @@ export type ShortcutId =
   | "view.zoomIn"
   | "view.zoomOut"
   | "view.zoomReset"
-  | "ai.toggle"
-  | "ai.askSelection"
+  | "commandPalette.open"
+  | "commandPalette.openCommand"
+  | "api.client"
   | "shortcuts.open"
+  | "git.commitAll"
+  | "git.push"
+  | "git.pull"
   | "settings.open"
+  | "snippets.add"
+  | "snippets.manage"
   | "sidebar.toggle";
 
 export type ShortcutGroup =
@@ -34,8 +40,8 @@ export type ShortcutGroup =
   | "Tabs"
   | "Panes"
   | "Search"
-  | "AI"
-  | "View";
+  | "View"
+  | "Snippets";
 
 export type KeyBinding = {
   key: string;
@@ -55,10 +61,61 @@ export type Shortcut = {
 
 export const SHORTCUTS: Shortcut[] = [
   {
+    id: "api.client",
+    label: "Open API Client",
+    group: "General",
+    defaultBindings: [],
+  },
+  {
     id: "settings.open",
     label: "Open settings",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "," }],
+  },
+  {
+    id: "snippets.add",
+    label: "Snippets: Create New Snippet",
+    group: "Snippets",
+    defaultBindings: [],
+  },
+  {
+    id: "snippets.manage",
+    label: "Snippets: Manage Snippets",
+    group: "Snippets",
+    defaultBindings: [],
+  },
+  {
+    id: "commandPalette.open",
+    label: "Search files",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, key: "p" }],
+  },
+  {
+    id: "commandPalette.openCommand",
+    label: "Show all commands",
+    group: "General",
+    defaultBindings: [
+      { [MOD_PROP]: true, shift: true, key: "p" },
+      { key: "F1" },
+    ],
+  },
+  {
+    id: "git.commitAll",
+    label: "Git: Commit All Changes",
+    group: "General",
+    defaultBindings: [],
+  },
+  {
+    id: "git.push",
+    label: "Git: Push",
+    group: "General",
+    defaultBindings: [],
+  },
+  {
+    id: "git.pull",
+    label: "Git: Pull",
+    group: "General",
+    defaultBindings: [],
   },
   {
     id: "shortcuts.open",
@@ -82,7 +139,7 @@ export const SHORTCUTS: Shortcut[] = [
     id: "tab.newPreview",
     label: "New preview tab",
     group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, key: "p" }],
+    defaultBindings: [],
   },
   {
     id: "tab.newEditor",
@@ -151,18 +208,6 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, key: "f" }],
   },
   {
-    id: "ai.toggle",
-    label: "Toggle AI agent",
-    group: "AI",
-    defaultBindings: [{ [MOD_PROP]: true, key: "i" }],
-  },
-  {
-    id: "ai.askSelection",
-    label: "Ask AI about selection",
-    group: "AI",
-    defaultBindings: [{ [MOD_PROP]: true, key: "l" }],
-  },
-  {
     id: "sidebar.toggle",
     label: "Toggle file explorer",
     group: "View",
@@ -208,7 +253,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "Panes",
   "View",
   "Search",
-  "AI",
+  "Snippets",
 ];
 
 /**

@@ -18,6 +18,8 @@ export type SlotAdapter = {
   resolveLeaf(leafId: number): LeafBridge | null;
   evictLeaf(leafId: number): void;
   isLeafFocused(leafId: number): boolean;
+  broadcastEnabled(leafId: number): boolean;
+  getBroadcastPeers(leafId: number): number[];
 };
 
 export type LeafBridge = {
@@ -152,6 +154,15 @@ function createSlot(): Slot {
     const leafId = slot.currentLeafId;
     if (leafId === null) return;
     adapter?.resolveLeaf(leafId)?.writeToPty(data);
+
+    if (adapter?.broadcastEnabled(leafId)) {
+      const peers = adapter.getBroadcastPeers(leafId);
+      for (const peerId of peers) {
+        if (peerId !== leafId) {
+          adapter.resolveLeaf(peerId)?.writeToPty(data);
+        }
+      }
+    }
   });
 
   slots.push(slot);

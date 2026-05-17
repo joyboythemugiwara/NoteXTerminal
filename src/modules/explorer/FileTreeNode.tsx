@@ -18,6 +18,7 @@ import {
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import type { DirEntry, useFileTree } from "./lib/useFileTree";
+import { useGitStore } from "@/modules/git/gitStore";
 
 type Tree = ReturnType<typeof useFileTree>;
 
@@ -34,7 +35,6 @@ type Props = {
    */
   onOpenFile: (path: string, pin?: boolean) => void;
   onRevealInTerminal?: (path: string) => void;
-  onAttachToAgent?: (path: string) => void;
   selectedPath: string | null;
   onSelectPath: (path: string) => void;
 };
@@ -47,7 +47,6 @@ function FileTreeNodeImpl({
   tree,
   onOpenFile,
   onRevealInTerminal,
-  onAttachToAgent,
   selectedPath,
   onSelectPath,
 }: Props) {
@@ -56,6 +55,8 @@ function FileTreeNodeImpl({
   const isExpanded = isDir && tree.expanded.has(path);
   const children = isExpanded ? tree.nodes[path] : undefined;
   const isRenaming = tree.renaming === path;
+
+  const gitStatus = useGitStore((s) => s.getFileStatus(path));
 
   const [isConfirming, setIsConfirming] = useState(false);
 
@@ -80,6 +81,11 @@ function FileTreeNodeImpl({
   // Context menu placement: directory targets itself for new file/folder;
   // a file targets its parent.
   const createTarget = isDir ? path : parentPath;
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("text/plain", path);
+    e.dataTransfer.effectAllowed = "copyMove";
+  };
 
   return (
     <>
@@ -106,6 +112,8 @@ function FileTreeNodeImpl({
             <button
               type="button"
               data-fs-path={path}
+              draggable={!isRenaming}
+              onDragStart={handleDragStart}
               onClick={handleClick}
               onDoubleClick={() => !isDir && tree.beginRename(path)}
               className={cn(
@@ -132,11 +140,32 @@ function FileTreeNodeImpl({
               ) : (
                 <span className="size-4 shrink-0" />
               )}
-              <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+              <span
+                className={cn(
+                  "min-w-0 flex-1 truncate",
+                  gitStatus === "modified" && "text-amber-500",
+                  gitStatus === "added" && "text-emerald-500",
+                  gitStatus === "untracked" && "text-emerald-500/80",
+                  gitStatus === "deleted" && "text-red-500",
+                )}
+              >
+                {entry.name}
+              </span>
+              {gitStatus && (
+                <span
+                  className={cn(
+                    "size-1.5 shrink-0 rounded-full",
+                    gitStatus === "modified" && "bg-amber-500",
+                    gitStatus === "added" && "bg-emerald-500",
+                    gitStatus === "untracked" && "bg-emerald-500/80",
+                    gitStatus === "deleted" && "bg-red-500",
+                  )}
+                />
+              )}
             </button>
           )}
         </ContextMenuTrigger>
-        <ContextMenuContent 
+        <ContextMenuContent
           className={COMPACT_CONTENT}
           onCloseAutoFocus={(e) => {
             if (tree.renaming || tree.pendingCreate) e.preventDefault();
@@ -189,13 +218,6 @@ function FileTreeNodeImpl({
             onSelect={() => void copyToClipboard(relativePath(rootPath, path))}
           >
             Copy Relative Path
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => onAttachToAgent?.(path)}
-          >
-            Attach to Agent
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem
@@ -277,7 +299,6 @@ function FileTreeNodeImpl({
             tree={tree}
             onOpenFile={onOpenFile}
             onRevealInTerminal={onRevealInTerminal}
-            onAttachToAgent={onAttachToAgent}
             selectedPath={selectedPath}
             onSelectPath={onSelectPath}
           />

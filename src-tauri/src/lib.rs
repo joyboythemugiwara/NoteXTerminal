@@ -1,8 +1,37 @@
 mod modules;
 
-use modules::{fs, net, pty, secrets, shell, workspace};
-use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use modules::{fs, git, net, pty, secrets, shell, workspace};
+use std::sync::Mutex;
+use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_window_state::StateFlags;
+
+/// Drained on first read so HMR / re-mounts can't replay the launch dir.
+#[derive(Default)]
+struct LaunchDir(Mutex<Option<String>>);
+
+#[tauri::command]
+fn get_launch_dir(state: State<'_, LaunchDir>) -> Option<String> {
+    state.0.lock().expect("LaunchDir mutex poisoned").take()
+}
+
+fn parse_launch_dir() -> Option<String> {
+    for arg in std::env::args().skip(1) {
+        if arg.starts_with('-') {
+            continue;
+        }
+        let Ok(canon) = std::fs::canonicalize(&arg) else {
+            continue;
+        };
+        let path = if canon.is_dir() {
+            canon
+        } else {
+            canon.parent()?.to_path_buf()
+        };
+        let s = path.to_string_lossy();
+        return Some(s.strip_prefix(r"\\?\").unwrap_or(&s).to_string());
+    }
+    None
+}
 
 #[tauri::command]
 async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Result<(), String> {
@@ -14,9 +43,7 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
     if let Some(window) = app.get_webview_window("settings") {
         let _ = window.set_focus();
         if let Some(t) = tab.as_deref().filter(|s| !s.is_empty()) {
-            // emit() serializes via JSON — no string-escape footgun, unlike
-            // eval() with format!(). Frontend listens via Tauri event API.
-            let _ = window.emit("terax:settings-tab", t);
+            let _ = window.emit("notex:settings-tab", t);
         }
         return Ok(());
     }
@@ -84,6 +111,7 @@ pub fn run() {
         .manage(pty::PtyState::default())
         .manage(shell::ShellState::default())
         .manage(secrets::SecretsState::default())
+        .manage(LaunchDir(Mutex::new(parse_launch_dir())))
         .invoke_handler(tauri::generate_handler![
             pty::pty_open,
             pty::pty_write,
@@ -101,6 +129,7 @@ pub fn run() {
             fs::mutate::fs_delete,
             fs::search::fs_search,
             fs::search::fs_list_files,
+            fs::symbols::fs_get_symbols,
             fs::grep::fs_grep,
             fs::grep::fs_glob,
             shell::shell_run_command,
@@ -115,14 +144,22 @@ pub fn run() {
             workspace::wsl_default_distro,
             workspace::wsl_home,
             open_settings_window,
+            git::git_get_status,
+            git::git_sync,
+            git::git_list_branches,
+            git::git_checkout_branch,
+            git::git_commit_all,
+            git::git_push,
+            git::git_pull,
+            get_launch_dir,
             secrets::secrets_get,
             secrets::secrets_set,
             secrets::secrets_delete,
             secrets::secrets_get_all,
             net::lm_ping,
-            net::ai_http_request,
-            net::ai_http_stream,
-        ])
+            net::http_request,
+            net::http_stream,
+            net::discover_localhost,        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -272,7 +272,7 @@ fn header_map_to_strings(headers: &HeaderMap) -> HashMap<String, String> {
 }
 
 #[tauri::command]
-pub async fn ai_http_request(
+pub async fn http_request(
     url: String,
     method: String,
     headers: Option<HashMap<String, String>>,
@@ -300,7 +300,7 @@ pub async fn ai_http_request(
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
-pub enum AiStreamEvent {
+pub enum HttpStreamEvent {
     Headers {
         status: u16,
         headers: HashMap<String, String>,
@@ -315,24 +315,24 @@ pub enum AiStreamEvent {
 }
 
 #[tauri::command]
-pub async fn ai_http_stream(
+pub async fn http_stream(
     url: String,
     method: String,
     headers: Option<HashMap<String, String>>,
     body: Option<Vec<u8>>,
     allow_private_network: Option<bool>,
-    on_event: Channel<AiStreamEvent>,
+    on_event: Channel<HttpStreamEvent>,
 ) -> Result<(), String> {
     let allow_private = allow_private_network.unwrap_or(false);
     let parsed = match validate_url(&url, allow_private) {
         Ok(p) => p,
         Err(e) => {
-            let _ = on_event.send(AiStreamEvent::Error { message: e.clone() });
+            let _ = on_event.send(HttpStreamEvent::Error { message: e.clone() });
             return Err(e);
         }
     };
     if let Err(e) = enforce_host_policy(&parsed, allow_private).await {
-        let _ = on_event.send(AiStreamEvent::Error { message: e.clone() });
+        let _ = on_event.send(HttpStreamEvent::Error { message: e.clone() });
         return Err(e);
     }
 
@@ -342,7 +342,7 @@ pub async fn ai_http_stream(
     let resp = match req.send().await {
         Ok(r) => r,
         Err(e) => {
-            let _ = on_event.send(AiStreamEvent::Error {
+            let _ = on_event.send(HttpStreamEvent::Error {
                 message: e.to_string(),
             });
             return Err(e.to_string());
@@ -351,7 +351,7 @@ pub async fn ai_http_stream(
 
     let status = resp.status().as_u16();
     let headers = header_map_to_strings(resp.headers());
-    let _ = on_event.send(AiStreamEvent::Headers { status, headers });
+    let _ = on_event.send(HttpStreamEvent::Headers { status, headers });
 
     let mut stream = resp.bytes_stream();
     while let Some(item) = stream.next().await {
@@ -359,7 +359,7 @@ pub async fn ai_http_stream(
             Ok(chunk) => {
                 let bytes: Bytes = chunk;
                 if on_event
-                    .send(AiStreamEvent::Chunk {
+                    .send(HttpStreamEvent::Chunk {
                         bytes: bytes.to_vec(),
                     })
                     .is_err()
@@ -369,7 +369,7 @@ pub async fn ai_http_stream(
                 }
             }
             Err(e) => {
-                let _ = on_event.send(AiStreamEvent::Error {
+                let _ = on_event.send(HttpStreamEvent::Error {
                     message: e.to_string(),
                 });
                 return Err(e.to_string());
@@ -377,6 +377,40 @@ pub async fn ai_http_stream(
         }
     }
 
-    let _ = on_event.send(AiStreamEvent::End);
+    let _ = on_event.send(HttpStreamEvent::End);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn discover_localhost() -> Result<Vec<u16>, String> {
+    let ports = vec![
+        3000, 3001, 3002, 4000, 4200, 5000, 5173, 5174, 8000, 8008, 8080, 8081, 9000,
+    ];
+    let mut discovered = Vec::new();
+
+    let mut tasks = Vec::new();
+    for port in ports {
+        tasks.push(tokio::spawn(async move {
+            let addr = format!("127.0.0.1:{}", port);
+            // Use a short timeout for local connections.
+            match tokio::time::timeout(
+                Duration::from_millis(100),
+                tokio::net::TcpStream::connect(addr),
+            )
+            .await
+            {
+                Ok(Ok(_)) => Some(port),
+                _ => None,
+            }
+        }));
+    }
+
+    for task in tasks {
+        if let Ok(Some(port)) = task.await {
+            discovered.push(port);
+        }
+    }
+
+    discovered.sort();
+    Ok(discovered)
 }

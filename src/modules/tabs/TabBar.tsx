@@ -12,14 +12,13 @@ import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   Cancel01Icon,
   ComputerTerminal02Icon,
-  GitCompareIcon,
   Globe02Icon,
   IncognitoIcon,
   PencilEdit02Icon,
   PlusSignIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EditorTab, Tab } from "./lib/useTabs";
 
 type Props = {
@@ -31,6 +30,7 @@ type Props = {
   onNewPreview: () => void;
   onNewEditor: () => void;
   onClose: (id: number) => void;
+  onRename: (id: number, title: string) => void;
   /** Pin (promote) a preview tab to persistent on double-click. */
   onPin: (id: number) => void;
   compact?: boolean;
@@ -45,10 +45,13 @@ export function TabBar({
   onNewPreview,
   onNewEditor,
   onClose,
+  onRename,
   onPin,
   compact,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   // Horizontal wheel scroll without holding shift.
   useEffect(() => {
@@ -72,6 +75,14 @@ export function TabBar({
     active?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeId, tabs.length]);
 
+  useEffect(() => {
+    if (editingId === null) return;
+    if (!tabs.some((t) => t.id === editingId && t.kind === "terminal")) {
+      setEditingId(null);
+      setEditValue("");
+    }
+  }, [editingId, tabs]);
+
   return (
     <div
       ref={scrollRef}
@@ -86,12 +97,22 @@ export function TabBar({
           <TabsList className="h-7 w-max gap-0.5 bg-transparent p-0">
             {tabs.map((t) => {
               const isPreview = t.kind === "editor" && (t as EditorTab).preview;
+              const isEditing = editingId === t.id && t.kind === "terminal";
               return (
                 <TabsTrigger
                   key={t.id}
                   value={String(t.id)}
                   data-tab-id={t.id}
-                  onDoubleClick={() => isPreview && onPin(t.id)}
+                  onDoubleClick={() => {
+                    if (isPreview) {
+                      onPin(t.id);
+                      return;
+                    }
+                    if (t.kind === "terminal") {
+                      setEditingId(t.id);
+                      setEditValue(t.title);
+                    }
+                  }}
                   className={cn(
                     "group h-7 shrink-0 gap-1.5 rounded-md text-xs text-muted-foreground transition-colors data-[state=active]:bg-accent data-[state=active]:text-foreground hover:text-foreground/80 justify-between",
                     compact
@@ -108,11 +129,40 @@ export function TabBar({
                     )}
                   >
                     <TabIcon tab={t} />
-                    {/* Preview tabs use italic to signal the transient state,
-                        matching the visual convention from VSCode. */}
-                    <span className={cn("truncate", isPreview && "italic")}>
-                      {labelFor(t)}
-                    </span>
+                    {isEditing ? (
+                      <input
+                        autoFocus
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Escape") {
+                            setEditingId(null);
+                            setEditValue("");
+                            return;
+                          }
+                          if (e.key === "Enter") {
+                            const next = editValue.trim();
+                            if (next && next !== t.title) onRename(t.id, next);
+                            setEditingId(null);
+                            setEditValue("");
+                          }
+                        }}
+                        onBlur={() => {
+                          const next = editValue.trim();
+                          if (next && next !== t.title) onRename(t.id, next);
+                          setEditingId(null);
+                          setEditValue("");
+                        }}
+                        className="h-5 w-28 rounded border border-border/60 bg-background px-1.5 text-xs text-foreground outline-none"
+                      />
+                    ) : (
+                      <span className={cn("truncate", isPreview && "italic")}>
+                        {labelFor(t)}
+                      </span>
+                    )}
                     {t.kind === "editor" && t.dirty ? (
                       <span
                         aria-label="Unsaved changes"
@@ -216,16 +266,6 @@ function TabIcon({ tab }: { tab: Tab }) {
       />
     );
   }
-  if (tab.kind === "ai-diff") {
-    return (
-      <HugeiconsIcon
-        icon={GitCompareIcon}
-        size={14}
-        strokeWidth={2}
-        className="shrink-0 text-yellow-600 dark:text-yellow-400"
-      />
-    );
-  }
   if (tab.kind === "terminal" && tab.private) {
     return (
       <HugeiconsIcon
@@ -249,7 +289,7 @@ function TabIcon({ tab }: { tab: Tab }) {
 function labelFor(t: Tab): string {
   if (t.kind === "editor") return t.title;
   if (t.kind === "preview") return t.title;
-  if (t.kind === "ai-diff") return t.title;
+  if (t.kind === "api-client") return t.title;
   if (!t.cwd) return t.title;
   const parts = t.cwd.split(/[\\/]/).filter(Boolean);
   return parts.length ? parts[parts.length - 1] : "/";

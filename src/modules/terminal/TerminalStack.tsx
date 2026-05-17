@@ -8,9 +8,14 @@ import { leafIds } from "./lib/panes";
 type Props = {
   tabs: Tab[];
   activeId: number;
+  broadcastActive?: boolean;
   /** Register/unregister handle by leaf id (not tab id). */
   registerHandle: (leafId: number, handle: TerminalPaneHandle | null) => void;
   onSearchReady: (leafId: number, addon: SearchAddon) => void;
+  onResults?: (
+    leafId: number,
+    results: { index: number; count: number },
+  ) => void;
   onCwd: (leafId: number, cwd: string) => void;
   onExit: (leafId: number, code: number) => void;
   onFocusLeaf: (tabId: number, leafId: number) => void;
@@ -19,6 +24,7 @@ type Props = {
 type Bundle = {
   setRef: (h: TerminalPaneHandle | null) => void;
   onSearch: (addon: SearchAddon) => void;
+  onResults: (results: { index: number; count: number }) => void;
   onCwd: (cwd: string) => void;
   onExit: (code: number) => void;
 };
@@ -28,6 +34,7 @@ export function TerminalStack({
   activeId,
   registerHandle,
   onSearchReady,
+  onResults,
   onCwd,
   onExit,
   onFocusLeaf,
@@ -39,14 +46,19 @@ export function TerminalStack({
 
   const registerRef = useRef(registerHandle);
   const searchReadyRef = useRef(onSearchReady);
+  const resultsRef = useRef(onResults);
   const cwdRef = useRef(onCwd);
   const exitRef = useRef(onExit);
+
   useEffect(() => {
     registerRef.current = registerHandle;
   }, [registerHandle]);
   useEffect(() => {
     searchReadyRef.current = onSearchReady;
   }, [onSearchReady]);
+  useEffect(() => {
+    resultsRef.current = onResults;
+  }, [onResults]);
   useEffect(() => {
     cwdRef.current = onCwd;
   }, [onCwd]);
@@ -61,6 +73,7 @@ export function TerminalStack({
       b = {
         setRef: (h) => registerRef.current(leafId, h),
         onSearch: (addon) => searchReadyRef.current(leafId, addon),
+        onResults: (r) => resultsRef.current?.(leafId, r),
         onCwd: (cwd) => cwdRef.current(leafId, cwd),
         onExit: (code) => exitRef.current(leafId, code),
       };

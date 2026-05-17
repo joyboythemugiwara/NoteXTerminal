@@ -21,6 +21,7 @@ export type PreviewPaneHandle = {
 type Props = {
   url: string;
   visible: boolean;
+  rootPath?: string | null;
   onUrlChange: (url: string) => void;
 };
 
@@ -29,7 +30,7 @@ type Props = {
 const SUSPEND_AFTER_MS = 30_000;
 
 export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
-  function PreviewPane({ url, visible, onUrlChange }, ref) {
+  function PreviewPane({ url, visible, rootPath, onUrlChange }, ref) {
     // `nonce` is part of the iframe `key`. Bumping it remounts the iframe,
     // which is the only reliable cross-origin reload (calling
     // contentWindow.location.reload() throws on cross-origin frames).
@@ -72,6 +73,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
         <PreviewAddressBar
           ref={addressRef}
           url={url}
+          rootPath={rootPath}
           onSubmit={onUrlChange}
           onReload={() => setNonce((n) => n + 1)}
         />

@@ -1,62 +1,39 @@
-# terax-shell-integration (PowerShell)
-# Emits OSC 7 (cwd) + OSC 133 A/B/D so the host tracks cwd and prompt boundaries.
+# notex-shell-integration (profile.ps1)
 
-if ($global:__TERAX_HOOKS_LOADED) { return }
-$global:__TERAX_HOOKS_LOADED = $true
+if (-not $env:__NOTEX_HOOKS_LOADED) {
+    $env:__NOTEX_HOOKS_LOADED = 1
 
-try {
-    [Console]::InputEncoding  = [System.Text.UTF8Encoding]::new($false)
-    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-    $global:OutputEncoding    = [System.Text.UTF8Encoding]::new($false)
-} catch {}
+    function _notex_precmd {
+        $last_status = $? ? 0 : 1
+        Write-Host -NoNewline "$([char]27)]133;D;$last_status$([char]27)\"
+        
+        $hostname = $env:COMPUTERNAME
+        $pwd_encoded = [uri]::EscapeDataString($ExecutionContext.SessionState.Path.CurrentLocation.Path)
+        Write-Host -NoNewline "$([char]27)]7;file://$hostname$pwd_encoded$([char]27)\"
+        Write-Host -NoNewline "$([char]27)]133;A$([char]27)\"
+    }
 
-if (Test-Path Function:prompt) {
-    Copy-Item Function:prompt Function:__terax_user_prompt -Force -ErrorAction SilentlyContinue
-}
+    # Custom Prompt
+    function prompt {
+        _notex_precmd
+        Write-Host -NoNewline "$([char]27)]133;B$([char]27)\"
+        
+        Write-Host -NoNewline -ForegroundColor Green $env:USERNAME
+        Write-Host -NoNewline "@"
+        Write-Host -NoNewline -ForegroundColor Green $env:COMPUTERNAME
+        Write-Host -NoNewline ":"
+        Write-Host -NoNewline -ForegroundColor Blue ($ExecutionContext.SessionState.Path.CurrentLocation.RelativePath -replace "^\.", "~")
 
-function global:__terax_urlencode {
-    param([string]$s)
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($s)
-    $sb = [System.Text.StringBuilder]::new($bytes.Length)
-    foreach ($b in $bytes) {
-        if (($b -ge 0x30 -and $b -le 0x39) -or
-            ($b -ge 0x41 -and $b -le 0x5A) -or
-            ($b -ge 0x61 -and $b -le 0x7A) -or
-            $b -eq 0x2F -or $b -eq 0x2E -or $b -eq 0x5F -or
-            $b -eq 0x7E -or $b -eq 0x2D) {
-            [void]$sb.Append([char]$b)
-        } else {
-            [void]$sb.AppendFormat('%{0:X2}', $b)
+        # Git branch
+        if (Get-Command git -ErrorAction SilentlyContinue) {
+            $branch = git rev-parse --abbrev-ref HEAD 2>$null
+            if ($branch) {
+                Write-Host -NoNewline " "
+                Write-Host -NoNewline -ForegroundColor Cyan "($branch)"
+            }
         }
+
+        Write-Host -NoNewline -ForegroundColor Green " > "
+        return " "
     }
-    $sb.ToString()
-}
-
-function global:prompt {
-    $lec = $LASTEXITCODE
-    if ($null -eq $lec) { $lec = if ($?) { 0 } else { 1 } }
-    $esc = [char]27
-
-    $oscD = "$esc]133;D;$lec$esc\"
-    $oscA = "$esc]133;A$esc\"
-    $oscB = "$esc]133;B$esc\"
-
-    $loc = Get-Location
-    $osc7 = ''
-    if ($loc.Provider.Name -eq 'FileSystem') {
-        $cwd = $loc.ProviderPath -replace '\\','/'
-        if ($cwd -match '^[A-Za-z]:') { $cwd = "/$cwd" }
-        $cwdEnc = __terax_urlencode $cwd
-        $hostName = [System.Environment]::MachineName
-        $osc7 = "$esc]7;file://$hostName$cwdEnc$esc\"
-    }
-
-    $original = if (Test-Path Function:__terax_user_prompt) {
-        try { & __terax_user_prompt } catch { "PS $((Get-Location).Path)> " }
-    } else {
-        "PS $((Get-Location).Path)> "
-    }
-
-    $global:LASTEXITCODE = $lec
-    "$oscD$oscA$osc7${original}${oscB}"
 }

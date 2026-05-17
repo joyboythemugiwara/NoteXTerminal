@@ -19,9 +19,9 @@ function distroCommand(key: DistroKey, version: string): string {
     case "arch":
       return "yay -S terax-bin";
     case "debian":
-      return `sudo apt install ./Terax_${version}_amd64.deb`;
+      return `sudo apt install ./NoteXTerminal_${version}_amd64.deb`;
     case "fedora":
-      return `sudo dnf install ./Terax-${version}-1.x86_64.rpm`;
+      return `sudo dnf install ./NoteXTerminal-${version}-1.x86_64.rpm`;
   }
 }
 
@@ -92,12 +92,12 @@ export function UpdaterDialog() {
               : downloading
                 ? "Downloading update…"
                 : manual
-                  ? `Terax v${manual.version} is available`
-                  : `Terax v${update?.version} is available`}
+                  ? `NoteXTerminal v${manual.version} is available`
+                  : `NoteXTerminal v${update?.version} is available`}
           </DialogTitle>
           <DialogDescription>
             {ready
-              ? "Restart Terax to finish installing."
+              ? "Restart NoteXTerminal to finish installing."
               : downloading
                 ? progress !== null
                   ? `${progress.toFixed(0)}% — ${formatBytes(status.downloaded)}`

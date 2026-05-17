@@ -6,6 +6,7 @@ import { PreviewPane, type PreviewPaneHandle } from "./PreviewPane";
 type Props = {
   tabs: Tab[];
   activeId: number;
+  rootPath?: string | null;
   onUrlChange: (id: number, url: string) => void;
   registerHandle: (id: number, handle: PreviewPaneHandle | null) => void;
 };
@@ -13,6 +14,7 @@ type Props = {
 export function PreviewStack({
   tabs,
   activeId,
+  rootPath,
   onUrlChange,
   registerHandle,
 }: Props) {
@@ -77,6 +79,7 @@ export function PreviewStack({
               ref={getRefCallback(t.id)}
               url={t.url}
               visible={visible}
+              rootPath={rootPath}
               onUrlChange={getUrlCallback(t.id)}
             />
           </div>

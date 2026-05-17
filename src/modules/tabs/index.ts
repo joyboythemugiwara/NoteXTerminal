@@ -6,8 +6,7 @@ export {
   type TerminalTab,
   type EditorTab,
   type PreviewTab,
-  type AiDiffTab,
-  type AiDiffStatus,
+  type ApiClientTab,
   type TabPatch,
 } from "./lib/useTabs";
 export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";

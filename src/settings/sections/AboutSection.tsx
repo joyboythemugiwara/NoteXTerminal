@@ -22,7 +22,7 @@ const PLATFORM_LABEL: Record<string, string> = {
 
 export function AboutSection() {
   const [version, setVersion] = useState("");
-  const [name, setName] = useState("Terax");
+  const [name, setName] = useState("NoteXTerminal");
   const [build, setBuild] = useState("");
   const { status, check, install } = useUpdater({ autoCheck: false });
   const checking = status.kind === "checking";
@@ -66,12 +66,15 @@ export function AboutSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader title="About" description="" />
+      <SectionHeader
+        title="About"
+        description="Version information, updates, and project links."
+      />
 
-      <div className="flex items-center gap-4 rounded-xl border border-border/60 bg-card/60 p-5">
-        <img src="/logo.png" alt="" className="size-12" draggable={false} />
+      <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 shadow-sm sm:gap-4 sm:p-5">
+        <img src="/logo.png" alt="" className="size-13 rounded-lg" draggable={false} />
         <div className="flex min-w-0 flex-col">
-          <span className="text-[15px] font-semibold tracking-tight">
+          <span className="text-[16px] font-semibold tracking-tight">
             {name}
           </span>
           <span className="text-[11px] text-muted-foreground">
@@ -83,7 +86,7 @@ export function AboutSection() {
         </div>
       </div>
 
-      <dl className="grid grid-cols-[110px_1fr] gap-y-2.5 text-[12px]">
+      <dl className="grid grid-cols-1 gap-y-2 rounded-xl border border-border/60 bg-card/50 p-4 text-[12px] sm:grid-cols-[120px_1fr] sm:gap-y-3">
         <dt className="text-muted-foreground">Build</dt>
         <dd className="font-mono text-[11.5px]">
           {build ? `${build} · v${version}` : `v${version}`}
@@ -119,8 +122,8 @@ export function AboutSection() {
         </dd>
       </dl>
 
-      <div className="flex flex-col gap-1.5">
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-card/50 p-4">
+        <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
             onClick={onUpdateClick}

@@ -3,6 +3,7 @@ export { TerminalStack } from "./TerminalStack";
 export {
   disposeSession,
   respawnSession,
+  setBroadcastState,
 } from "./lib/useTerminalSession";
 export {
   hasLeaf,

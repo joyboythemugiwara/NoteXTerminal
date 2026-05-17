@@ -24,3 +24,11 @@ dist-ssr
 *.sw?
 
 *.tsbuildinfo
+CONTRIBUTING.md
+NOTEXTERMINAL.md
+notexterminal-icon.png
+package.json.new
+upcoming_features.md
+GEMINI.md
+CHANGELOG.md
+CLAUDE.md

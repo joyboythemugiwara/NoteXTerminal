@@ -50,7 +50,7 @@ fn ensure_utf8_locale(cmd: &mut CommandBuilder) {
 fn apply_common(cmd: &mut CommandBuilder, cwd: Option<String>) {
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
-    cmd.env("TERAX_TERMINAL", "1");
+    cmd.env("NOTEX_TERMINAL", "1");
     ensure_utf8_locale(cmd);
 
     let resolved_cwd = cwd
@@ -133,7 +133,7 @@ mod unix {
                 match prepare_zdotdir() {
                     Ok(zdotdir) => {
                         if let Ok(user_zd) = std::env::var("ZDOTDIR") {
-                            cmd.env("TERAX_USER_ZDOTDIR", user_zd);
+                            cmd.env("NOTEX_USER_ZDOTDIR", user_zd);
                         }
                         cmd.env("ZDOTDIR", zdotdir);
                     }
@@ -188,7 +188,7 @@ mod unix {
 
     fn integration_root() -> Result<PathBuf, String> {
         let home = dirs::home_dir().ok_or_else(|| "could not resolve home dir".to_string())?;
-        let root = home.join(".cache").join("terax").join("shell-integration");
+        let root = home.join(".cache").join("notex").join("shell-integration");
         fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
         Ok(root)
     }
@@ -227,7 +227,7 @@ mod unix {
         }
         // Atomic replace: a parallel shell startup must never source a half-written file.
         let mut tmp: OsString = path.as_os_str().to_owned();
-        tmp.push(".__terax_tmp__");
+        tmp.push(".__notex_tmp__");
         let tmp = PathBuf::from(tmp);
         fs::write(&tmp, content).map_err(|e| format!("write {}: {e}", tmp.display()))?;
         fs::rename(&tmp, path).map_err(|e| {
@@ -305,7 +305,7 @@ mod windows {
         cmd.arg("-i");
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
-        cmd.env("TERAX_TERMINAL", "1");
+        cmd.env("NOTEX_TERMINAL", "1");
         super::ensure_utf8_locale(&mut cmd);
         log::info!("spawning WSL shell: {distro}");
         Ok(cmd)
@@ -314,7 +314,7 @@ mod windows {
     fn prepare_wsl_bash_rcfile(distro: &str) -> Result<String, String> {
         let home = crate::modules::workspace::wsl_home(distro.to_string())?;
         let linux_dir = format!(
-            "{}/.cache/terax/shell-integration/bash",
+            "{}/.cache/notex/shell-integration/bash",
             home.trim_end_matches('/')
         );
         let linux_rc = format!("{linux_dir}/bashrc");
@@ -328,7 +328,7 @@ mod windows {
 
     fn integration_root() -> Result<PathBuf, String> {
         let home = dirs::home_dir().ok_or_else(|| "could not resolve home dir".to_string())?;
-        let root = home.join(".cache").join("terax").join("shell-integration");
+        let root = home.join(".cache").join("notex").join("shell-integration");
         fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
         Ok(root)
     }
@@ -348,7 +348,7 @@ mod windows {
             }
         }
         let mut tmp: OsString = path.as_os_str().to_owned();
-        tmp.push(".__terax_tmp__");
+        tmp.push(".__notex_tmp__");
         let tmp = PathBuf::from(tmp);
         fs::write(&tmp, content).map_err(|e| format!("write {}: {e}", tmp.display()))?;
         fs::rename(&tmp, path).map_err(|e| {

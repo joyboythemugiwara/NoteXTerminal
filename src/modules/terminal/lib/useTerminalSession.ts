@@ -18,8 +18,14 @@ import {
   setSlotFocused,
 } from "./rendererPool";
 
+type SearchResults = {
+  index: number;
+  count: number;
+};
+
 type Callbacks = {
   onSearchReady?: (addon: SearchAddon) => void;
+  onResults?: (r: SearchResults) => void;
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
 };
@@ -47,6 +53,14 @@ type Session = {
 
 const sessions = new Map<number, Session>();
 
+let broadcastActiveGlobal = false;
+let broadcastLeafIdsGlobal: number[] = [];
+
+export function setBroadcastState(active: boolean, leafIds: number[]) {
+  broadcastActiveGlobal = active;
+  broadcastLeafIdsGlobal = leafIds;
+}
+
 configureRendererPool({
   resolveLeaf(leafId) {
     const s = sessions.get(leafId);
@@ -67,9 +81,18 @@ configureRendererPool({
     if (!s) return;
     unbindLeafFromSlot(leafId, s);
   },
-  isLeafFocused(leafId) {
+  isLeafFocused(leafId: number) {
     const s = sessions.get(leafId);
     return !!s && s.visibleNow && s.focusedNow;
+  },
+  broadcastEnabled(leafId: number) {
+    return broadcastActiveGlobal && broadcastLeafIdsGlobal.includes(leafId);
+  },
+  getBroadcastPeers(leafId: number) {
+    if (!broadcastActiveGlobal || !broadcastLeafIdsGlobal.includes(leafId)) {
+      return [];
+    }
+    return broadcastLeafIdsGlobal;
   },
 });
 
@@ -282,6 +305,7 @@ type Options = {
   focused?: boolean;
   initialCwd?: string;
   onSearchReady?: (addon: SearchAddon) => void;
+  onResults?: (r: SearchResults) => void;
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
 };
@@ -293,11 +317,12 @@ export function useTerminalSession({
   focused = true,
   initialCwd,
   onSearchReady,
+  onResults,
   onExit,
   onCwd,
 }: Options) {
-  const cbRef = useRef({ onSearchReady, onExit, onCwd });
-  cbRef.current = { onSearchReady, onExit, onCwd };
+  const cbRef = useRef({ onSearchReady, onResults, onExit, onCwd });
+  cbRef.current = { onSearchReady, onResults, onExit, onCwd };
 
   useEffect(() => {
     let cancelled = false;
@@ -308,6 +333,7 @@ export function useTerminalSession({
       if (!node) return;
       attachSession(leafId, node, {
         onSearchReady: (a) => cbRef.current.onSearchReady?.(a),
+        onResults: (r) => cbRef.current.onResults?.(r),
         onExit: (c) => cbRef.current.onExit?.(c),
         onCwd: (c) => cbRef.current.onCwd?.(c),
       });
@@ -318,6 +344,16 @@ export function useTerminalSession({
       detachSession(leafId);
     };
   }, [leafId, container, initialCwd]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const slot = getSlotForLeaf(leafId);
+    if (!slot) return;
+    const unsub = slot.searchAddon.onDidChangeResults((r) => {
+      cbRef.current.onResults?.({ index: r.resultIndex, count: r.resultCount });
+    });
+    return () => unsub.dispose();
+  }, [leafId, visible]);
 
   const fontSize = usePreferencesStore((p) => p.terminalFontSize);
   const zoomLevel = usePreferencesStore((p) => p.zoomLevel);

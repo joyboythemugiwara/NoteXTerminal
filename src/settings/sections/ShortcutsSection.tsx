@@ -72,10 +72,10 @@ export function ShortcutsSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SectionHeader
           title="Shortcuts"
-          description="View and customize keyboard shortcuts."
+          description="Search, customize, and reset keyboard shortcuts."
         />
         <Button
           variant="outline"
@@ -103,11 +103,11 @@ export function ShortcutsSection() {
           placeholder="Search shortcuts..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-9 pl-9 text-[12.5px]"
+          className="h-10 rounded-xl border-border/60 bg-background/80 pl-9 text-[12.5px]"
         />
       </div>
 
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6 sm:gap-8">
         {SHORTCUT_GROUPS.map((group) => {
           const items = filteredShortcuts.filter((s) => s.group === group);
           if (items.length === 0) return null;
@@ -117,7 +117,7 @@ export function ShortcutsSection() {
               <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                 {group}
               </h3>
-              <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
+              <div className="flex flex-col divide-y divide-border/40 overflow-hidden rounded-xl border border-border/60 bg-card/70 shadow-sm">
                 {items.map((s) => (
                   <ShortcutRow
                     key={s.id}
@@ -186,12 +186,12 @@ function ShortcutRow({
   const hasBindings = bindings && bindings.length > 0;
 
   return (
-    <div className="group flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-muted/30">
+    <div className="group flex flex-col gap-2 px-3 py-3 transition-colors hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between sm:px-4">
       <div className="flex flex-col gap-0.5">
-        <span className="text-[12.5px] font-medium">{shortcut.label}</span>
+        <span className="text-[13px] font-medium tracking-tight">{shortcut.label}</span>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
         {isRecording ? (
           <Recorder onRecord={onRecord} onCancel={onStopRecording} />
         ) : (

@@ -14,6 +14,11 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
+  isLiveServerRunning,
+  startLiveServer,
+  stopLiveServer,
+} from "./liveServer";
+import {
   forwardRef,
   useEffect,
   useImperativeHandle,
@@ -53,12 +58,13 @@ export type PreviewAddressBarHandle = {
 
 type Props = {
   url: string;
+  rootPath?: string | null;
   onSubmit: (url: string) => void;
   onReload: () => void;
 };
 
 export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
-  function PreviewAddressBar({ url, onSubmit, onReload }, ref) {
+  function PreviewAddressBar({ url, rootPath, onSubmit, onReload }, ref) {
     const [draft, setDraft] = useState(url);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -83,6 +89,23 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
 
     const [notice, setNotice] = useState<string | null>(null);
     const [checkingPort, setCheckingPort] = useState<number | null>(null);
+    const [liveRunning, setLiveRunning] = useState(false);
+    const [liveBusy, setLiveBusy] = useState(false);
+
+    useEffect(() => {
+      if (!rootPath) {
+        setLiveRunning(false);
+        return;
+      }
+      let alive = true;
+      void isLiveServerRunning(rootPath).then((v) => {
+        if (!alive) return;
+        setLiveRunning(v);
+      });
+      return () => {
+        alive = false;
+      };
+    }, [rootPath]);
 
     const submit = () => {
       const next = normalizeUrl(draft);
@@ -107,6 +130,33 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
       }
       setDraft(url);
       onSubmit(url);
+    };
+
+    const toggleLiveServer = async () => {
+      if (!rootPath || liveBusy) return;
+      setLiveBusy(true);
+      setNotice(null);
+      try {
+        if (liveRunning) {
+          await stopLiveServer(rootPath);
+          setLiveRunning(false);
+          setNotice("Live server stopped.");
+        } else {
+          const { url, mode } = await startLiveServer(rootPath);
+          setLiveRunning(true);
+          setDraft(url);
+          onSubmit(url);
+          setNotice(
+            mode === "vite-dist"
+              ? `Live server started at ${url} (serving dist/)`
+              : `Live server started at ${url}`,
+          );
+        }
+      } catch (e) {
+        setNotice(`Live server error: ${String(e)}`);
+      } finally {
+        setLiveBusy(false);
+      }
     };
 
     return (
@@ -163,6 +213,17 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        <Button
+          type="button"
+          variant={liveRunning ? "secondary" : "ghost"}
+          size="sm"
+          title={liveRunning ? "Stop Live Server" : "Start Live Server"}
+          className="h-7 shrink-0 rounded-md px-2 text-[11px]"
+          onClick={() => void toggleLiveServer()}
+          disabled={!rootPath || liveBusy}
+        >
+          {liveBusy ? "Working..." : liveRunning ? "Stop Live" : "Start Live"}
+        </Button>
         <div className="flex min-w-0 flex-1 items-center">
           <Input
             ref={inputRef}

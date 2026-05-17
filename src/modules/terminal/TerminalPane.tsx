@@ -19,6 +19,10 @@ type Props = {
   focused?: boolean;
   initialCwd?: string;
   onSearchReady?: (leafId: number, addon: SearchAddon) => void;
+  onResults?: (
+    leafId: number,
+    results: { index: number; count: number },
+  ) => void;
   onExit?: (leafId: number, code: number) => void;
   onCwd?: (leafId: number, cwd: string) => void;
 };
@@ -31,6 +35,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       focused = true,
       initialCwd,
       onSearchReady,
+      onResults,
       onExit,
       onCwd,
     },
@@ -46,6 +51,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       focused,
       initialCwd,
       onSearchReady: (a) => onSearchReady?.(leafId, a),
+      onResults: (r) => onResults?.(leafId, r),
       onExit: (c) => onExit?.(leafId, c),
       onCwd: (c) => onCwd?.(leafId, c),
     });
@@ -67,9 +73,36 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       [session],
     );
 
+    const handleDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      let path = e.dataTransfer.getData("text/plain");
+      
+      if (!path && e.dataTransfer.files.length > 0) {
+        // This is a file from the OS. In some environments, webview might not 
+        // give the full path due to security. But in Tauri it usually does if
+        // configured. 
+        // Actually, better to use Tauri's native drag-drop if possible, 
+        // but let's try this first.
+        path = (e.dataTransfer.files[0] as any).path || e.dataTransfer.files[0].name;
+      }
+
+      if (path) {
+        const quoted = path.includes(" ") ? `"${path}"` : path;
+        session.write(quoted);
+        session.focus();
+      }
+    };
+
     return (
       <div
         ref={containerRef}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
         className="zoom-exempt h-full w-full"
         style={{
           visibility: visible ? "visible" : "hidden",
